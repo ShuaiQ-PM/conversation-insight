@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Linear Style Starter",
-  description: "Next.js + shadcn/ui dark theme starter",
+  description: "Next.js + shadcn/ui light theme starter",
 };
 
 export default function RootLayout({
@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body className="antialiased">
         {children}
       </body>
