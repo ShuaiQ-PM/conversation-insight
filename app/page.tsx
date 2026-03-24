@@ -283,13 +283,13 @@ export default function Home() {
       let bestScenario: Scenario | null = null;
       let bestScore = 0;
 
-      allScenarios.forEach((scenario) => {
+      for (const scenario of allScenarios) {
         const score = scenario.keywords.reduce((sum, keyword) => sum + countHits(text, keyword), 0);
         if (score > bestScore) {
           bestScore = score;
           bestScenario = scenario;
         }
-      });
+      }
 
       return {
         session,
