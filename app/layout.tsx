@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import "antd/dist/reset.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Linear Style Starter",
-  description: "Next.js + shadcn/ui light theme starter",
+  title: "Conversation Insight Dashboard",
+  description: "Next.js dashboard styled with Ant Design",
 };
 
 export default function RootLayout({

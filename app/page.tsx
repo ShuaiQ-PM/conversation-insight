@@ -2,37 +2,40 @@
 
 import { useMemo, useState } from "react";
 import {
-  BarChart3,
-  CirclePlus,
-  HeartHandshake,
-  MessageSquareText,
-  Search,
-  Sparkles,
-  TrendingUp,
-} from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+  AppstoreOutlined,
+  FrownOutlined,
+  MessageOutlined,
+  PlusOutlined,
+  SearchOutlined,
+  SmileOutlined,
+  ThunderboltOutlined,
+} from "@ant-design/icons";
 import {
+  Button,
   Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+  Col,
+  ConfigProvider,
+  Divider,
+  Empty,
+  Flex,
+  Input,
+  List,
+  Modal,
+  Progress,
+  Row,
+  Space,
+  Statistic,
+  Table,
+  Tabs,
+  Tag,
+  Typography,
+  message as antdMessage,
+} from "antd";
+import type { TableColumnsType, TabsProps } from "antd";
 
-type Message = {
+const { Title, Paragraph, Text } = Typography;
+
+type ChatMessage = {
   speaker: "客户" | "客服";
   text: string;
   at: string;
@@ -43,7 +46,7 @@ type ChatSession = {
   customerName: string;
   customerTag: string;
   region: string;
-  messages: Message[];
+  messages: ChatMessage[];
 };
 
 type Scenario = {
@@ -58,6 +61,13 @@ type Product = {
   name: string;
   keywords: string[];
   category: string;
+};
+
+type DrillState = {
+  open: boolean;
+  title: string;
+  description: string;
+  sessions: ChatSession[];
 };
 
 const chatSessions: ChatSession[] = [
@@ -151,31 +161,8 @@ const chatSessions: ChatSession[] = [
   },
 ];
 
-const positiveLexicon = [
-  "喜欢",
-  "太好了",
-  "划算",
-  "不错",
-  "满意",
-  "实用",
-  "稳定",
-  "太棒了",
-  "吸引",
-  "信任",
-];
-
-const negativeLexicon = [
-  "杂音",
-  "出问题",
-  "没更新",
-  "着急",
-  "体验很差",
-  "退货",
-  "失望",
-  "发灰",
-  "不然",
-  "影响",
-];
+const positiveLexicon = ["喜欢", "太好了", "划算", "不错", "满意", "实用", "稳定", "太棒了", "吸引", "信任"];
+const negativeLexicon = ["杂音", "出问题", "没更新", "着急", "体验很差", "退货", "失望", "发灰", "不然", "影响"];
 
 const defaultScenarios: Scenario[] = [
   { id: "scenario-pre", name: "售前问题", keywords: ["有现货", "优惠", "价格", "活动", "买吗", "推荐"], source: "builtin" },
@@ -193,21 +180,14 @@ const products: Product[] = [
   { id: "p7", name: "咖啡机 C9", category: "厨房电器", keywords: ["咖啡机", "磨豆机"] },
 ];
 
-type DrillState = {
-  open: boolean;
-  title: string;
-  description: string;
-  sessions: ChatSession[];
-};
-
 function countHits(text: string, keyword: string) {
   return text.includes(keyword) ? 1 : 0;
 }
 
 function getCustomerText(session: ChatSession) {
   return session.messages
-    .filter((message) => message.speaker === "客户")
-    .map((message) => message.text)
+    .filter((item) => item.speaker === "客户")
+    .map((item) => item.text)
     .join(" ");
 }
 
@@ -216,55 +196,38 @@ export default function Home() {
   const [scenarioName, setScenarioName] = useState("");
   const [scenarioKeywords, setScenarioKeywords] = useState("");
   const [activeScenarioId, setActiveScenarioId] = useState(defaultScenarios[0].id);
-  const [drill, setDrill] = useState<DrillState>({
-    open: false,
-    title: "",
-    description: "",
-    sessions: [],
-  });
+  const [drill, setDrill] = useState<DrillState>({ open: false, title: "", description: "", sessions: [] });
 
   const allScenarios = useMemo(() => [...defaultScenarios, ...customScenarios], [customScenarios]);
 
   const emotionResult = useMemo(() => {
     const bySession = chatSessions.map((session) => {
       const customerText = getCustomerText(session);
-      const positiveHits = positiveLexicon.reduce(
-        (total, keyword) => total + countHits(customerText, keyword),
-        0,
-      );
-      const negativeHits = negativeLexicon.reduce(
-        (total, keyword) => total + countHits(customerText, keyword),
-        0,
-      );
+      const positiveHits = positiveLexicon.reduce((total, keyword) => total + countHits(customerText, keyword), 0);
+      const negativeHits = negativeLexicon.reduce((total, keyword) => total + countHits(customerText, keyword), 0);
 
       return {
+        key: session.id,
         session,
         positiveHits,
         negativeHits,
         polarity:
-          positiveHits === negativeHits
-            ? "中性"
-            : positiveHits > negativeHits
-              ? "正向"
-              : "负向",
+          positiveHits === negativeHits ? "中性" : positiveHits > negativeHits ? "正向" : "负向",
       };
     });
 
     const positiveCount = bySession.filter((item) => item.polarity === "正向").length;
     const negativeCount = bySession.filter((item) => item.polarity === "负向").length;
 
-    const topWords = (lexicon: string[]) => {
-      return lexicon
+    const topWords = (lexicon: string[]) =>
+      lexicon
         .map((word) => {
-          const relatedSessions = chatSessions.filter((session) =>
-            getCustomerText(session).includes(word),
-          );
+          const relatedSessions = chatSessions.filter((session) => getCustomerText(session).includes(word));
           return { word, count: relatedSessions.length, relatedSessions };
         })
         .filter((item) => item.count > 0)
         .sort((a, b) => b.count - a.count)
         .slice(0, 6);
-    };
 
     return {
       bySession,
@@ -292,6 +255,7 @@ export default function Home() {
       }
 
       return {
+        key: session.id,
         session,
         scenarioId: bestScenario?.id ?? "unclassified",
         scenarioName: bestScenario?.name ?? "未归类",
@@ -302,6 +266,7 @@ export default function Home() {
       const related = assignments.filter((item) => item.scenarioId === scenario.id).map((item) => item.session);
       return {
         ...scenario,
+        key: scenario.id,
         count: related.length,
         sessions: related,
       };
@@ -320,6 +285,7 @@ export default function Home() {
 
         return {
           ...product,
+          key: product.id,
           heat: relatedSessions.length,
           sessions: relatedSessions,
         };
@@ -342,349 +308,410 @@ export default function Home() {
     setDrill({ open: true, title, description, sessions });
   };
 
-  const addCustomScenario = () => {
-    const trimmedName = scenarioName.trim();
-    const parsedKeywords = scenarioKeywords
+  const addScenario = () => {
+    const name = scenarioName.trim();
+    const keywords = scenarioKeywords
       .split(/[，,]/)
       .map((item) => item.trim())
       .filter(Boolean);
 
-    if (!trimmedName || parsedKeywords.length === 0) {
+    if (!name || keywords.length === 0) {
+      antdMessage.warning("请输入场景名称，并至少填写一个关键词");
       return;
     }
 
-    const scenario: Scenario = {
-      id: `scenario-custom-${Date.now()}`,
-      name: trimmedName,
-      keywords: parsedKeywords,
+    const next: Scenario = {
+      id: `custom-${Date.now()}`,
+      name,
+      keywords,
       source: "custom",
     };
 
-    setCustomScenarios((prev) => [scenario, ...prev]);
-    setActiveScenarioId(scenario.id);
+    setCustomScenarios((prev) => [...prev, next]);
     setScenarioName("");
     setScenarioKeywords("");
+    setActiveScenarioId(next.id);
+    antdMessage.success("已新增自定义场景");
   };
 
-  return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(49,111,255,0.18),transparent_36%),radial-gradient(circle_at_80%_0%,rgba(26,188,156,0.16),transparent_34%)] px-4 py-8 md:px-10 md:py-10">
-      <section className="mx-auto w-full max-w-6xl space-y-6">
-        <header className="rounded-2xl border border-border/70 bg-card/80 p-6 backdrop-blur">
-          <p className="text-xs tracking-[0.22em] text-muted-foreground uppercase">
-            Customer Conversation Intelligence
-          </p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight md:text-4xl">
-            基于客户聊天记录的会话洞察
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            聚合客户对话，完成情绪识别、场景归因与产品需求挖掘，并支持热词与产品点击下钻查看客户明细、聊天原文。
-          </p>
-        </header>
+  const emotionColumns: TableColumnsType<(typeof emotionResult.bySession)[number]> = [
+    {
+      title: "会话",
+      key: "session",
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <Text strong>{record.session.customerName}</Text>
+          <Text type="secondary">{record.session.id}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: "地区",
+      dataIndex: ["session", "region"],
+    },
+    {
+      title: "正向命中",
+      dataIndex: "positiveHits",
+      align: "center",
+    },
+    {
+      title: "负向命中",
+      dataIndex: "negativeHits",
+      align: "center",
+    },
+    {
+      title: "情绪极性",
+      dataIndex: "polarity",
+      render: (value: string) =>
+        value === "正向" ? <Tag color="success">{value}</Tag> : value === "负向" ? <Tag color="error">{value}</Tag> : <Tag>{value}</Tag>,
+    },
+  ];
 
-        <Tabs defaultValue="emotion" className="gap-4">
-          <TabsList variant="line" className="w-full justify-start overflow-x-auto p-0">
-            <TabsTrigger value="emotion" className="gap-2">
-              <HeartHandshake className="size-4" />
-              情绪分析
-            </TabsTrigger>
-            <TabsTrigger value="scenario" className="gap-2">
-              <Sparkles className="size-4" />
-              自定义洞察场景
-            </TabsTrigger>
-            <TabsTrigger value="product" className="gap-2">
-              <TrendingUp className="size-4" />
-              产品需求洞察
-            </TabsTrigger>
-          </TabsList>
+  const scenarioColumns: TableColumnsType<(typeof scenarioResult.stats)[number]> = [
+    {
+      title: "场景",
+      key: "name",
+      render: (_, record) => (
+        <Space>
+          <Text strong>{record.name}</Text>
+          <Tag color={record.source === "builtin" ? "blue" : "purple"}>{record.source === "builtin" ? "系统" : "自定义"}</Tag>
+        </Space>
+      ),
+    },
+    {
+      title: "命中会话",
+      dataIndex: "count",
+      align: "center",
+      sorter: (a, b) => a.count - b.count,
+    },
+    {
+      title: "操作",
+      key: "action",
+      render: (_, record) => (
+        <Space>
+          <Button type="link" onClick={() => setActiveScenarioId(record.id)}>
+            查看详情
+          </Button>
+          <Button
+            type="link"
+            icon={<SearchOutlined />}
+            onClick={() => openDrill(record.name, `命中关键词：${record.keywords.join(" / ")}`, record.sessions)}
+          >
+            查看会话
+          </Button>
+        </Space>
+      ),
+    },
+  ];
 
-          <TabsContent value="emotion" className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card className="border-emerald-500/30 bg-card/85">
-                <CardHeader>
-                  <CardTitle className="text-emerald-300">正向情绪总结</CardTitle>
-                  <CardDescription>{emotionResult.positiveSummary}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="text-2xl font-semibold">{emotionResult.positiveCount} 条</div>
-                  <div className="flex flex-wrap gap-2">
+  const productColumns: TableColumnsType<(typeof productInsight.rows)[number]> = [
+    {
+      title: "产品",
+      key: "name",
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <Text strong>{record.name}</Text>
+          <Tag>{record.category}</Tag>
+        </Space>
+      ),
+    },
+    {
+      title: "热度",
+      key: "heat",
+      render: (_, record) => (
+        <Progress
+          percent={Math.round((record.heat / productInsight.maxHeat) * 100)}
+          size="small"
+          format={() => `${record.heat}`}
+        />
+      ),
+    },
+    {
+      title: "关联会话",
+      key: "sessions",
+      render: (_, record) => (
+        <Button
+          type="link"
+          icon={<SearchOutlined />}
+          onClick={() => openDrill(record.name, `关联关键词：${record.keywords.join(" / ")}`, record.sessions)}
+        >
+          查看 {record.sessions.length} 条
+        </Button>
+      ),
+    },
+  ];
+
+  const tabItems: TabsProps["items"] = [
+    {
+      key: "emotion",
+      label: "情绪趋势分析",
+      children: (
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={12}>
+              <Card>
+                <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                  <Space>
+                    <SmileOutlined style={{ color: "#16a34a" }} />
+                    <Text strong>正向情绪</Text>
+                  </Space>
+                  <Paragraph style={{ margin: 0 }}>{emotionResult.positiveSummary}</Paragraph>
+                  <Space size={[8, 8]} wrap>
                     {emotionResult.positiveHotWords.map((item) => (
-                      <Button
-                        key={item.word}
-                        variant="outline"
-                        size="xs"
-                        onClick={() =>
-                          openDrill(
-                            `正向热词：${item.word}`,
-                            `命中 ${item.count} 位客户，点击可查看客户详情与原始聊天记录。`,
-                            item.relatedSessions,
-                          )
-                        }
-                      >
+                      <Tag key={item.word} color="success">
                         {item.word} · {item.count}
-                      </Button>
+                      </Tag>
                     ))}
-                  </div>
-                </CardContent>
+                  </Space>
+                </Space>
               </Card>
-
-              <Card className="border-rose-500/30 bg-card/85">
-                <CardHeader>
-                  <CardTitle className="text-rose-300">负向情绪总结</CardTitle>
-                  <CardDescription>{emotionResult.negativeSummary}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="text-2xl font-semibold">{emotionResult.negativeCount} 条</div>
-                  <div className="flex flex-wrap gap-2">
+            </Col>
+            <Col xs={24} md={12}>
+              <Card>
+                <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                  <Space>
+                    <FrownOutlined style={{ color: "#dc2626" }} />
+                    <Text strong>负向情绪</Text>
+                  </Space>
+                  <Paragraph style={{ margin: 0 }}>{emotionResult.negativeSummary}</Paragraph>
+                  <Space size={[8, 8]} wrap>
                     {emotionResult.negativeHotWords.map((item) => (
-                      <Button
-                        key={item.word}
-                        variant="outline"
-                        size="xs"
-                        onClick={() =>
-                          openDrill(
-                            `负向热词：${item.word}`,
-                            `命中 ${item.count} 位客户，建议优先排查对应服务链路。`,
-                            item.relatedSessions,
-                          )
-                        }
-                      >
+                      <Tag key={item.word} color="error">
                         {item.word} · {item.count}
-                      </Button>
+                      </Tag>
                     ))}
-                  </div>
-                </CardContent>
+                  </Space>
+                </Space>
               </Card>
-            </div>
+            </Col>
+          </Row>
 
-            <Card className="bg-card/85">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="size-4" />
-                  会话级情绪明细
-                </CardTitle>
-                <CardDescription>按会话展示情绪方向，便于客服主管快速定位重点客户。</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-3">
-                  {emotionResult.bySession.map((item) => (
-                    <div key={item.session.id} className="rounded-lg border border-border/70 bg-background/50 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <div className="font-medium">
-                          {item.session.customerName} · {item.session.customerTag} · {item.session.region}
-                        </div>
-                        <div
-                          className={`rounded-full px-2 py-0.5 text-xs ${
-                            item.polarity === "正向"
-                              ? "bg-emerald-500/15 text-emerald-300"
-                              : item.polarity === "负向"
-                                ? "bg-rose-500/15 text-rose-300"
-                                : "bg-slate-500/15 text-slate-300"
-                          }`}
-                        >
-                          {item.polarity}
-                        </div>
-                      </div>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        正向词 {item.positiveHits} / 负向词 {item.negativeHits}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="scenario" className="space-y-4">
-            <Card className="bg-card/85">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CirclePlus className="size-4" />
-                  新建自定义洞察场景
-                </CardTitle>
-                <CardDescription>
-                  例如创建“售前问题”“售后问题”之外的专属场景，通过关键词将客户会话自动归类。
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-[1fr_1.4fr_auto]">
+          <Card title="会话情绪明细">
+            <Table columns={emotionColumns} dataSource={emotionResult.bySession} pagination={false} size="middle" />
+          </Card>
+        </Space>
+      ),
+    },
+    {
+      key: "scenario",
+      label: "场景分析",
+      children: (
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <Card title="新增自定义场景">
+            <Row gutter={[12, 12]}>
+              <Col xs={24} md={8}>
+                <Input value={scenarioName} placeholder="例如：活动咨询" onChange={(e) => setScenarioName(e.target.value)} />
+              </Col>
+              <Col xs={24} md={12}>
                 <Input
-                  value={scenarioName}
-                  onChange={(event) => setScenarioName(event.target.value)}
-                  placeholder="场景名称，例如：活动咨询"
-                />
-                <Textarea
                   value={scenarioKeywords}
-                  onChange={(event) => setScenarioKeywords(event.target.value)}
-                  placeholder="关键词，使用逗号分隔，例如：满减,券,赠品"
-                  className="min-h-9 resize-none"
+                  placeholder="关键词，使用逗号分隔。例如：优惠券,满减,活动价"
+                  onChange={(e) => setScenarioKeywords(e.target.value)}
                 />
-                <Button onClick={addCustomScenario} className="md:self-start">
-                  创建场景
+              </Col>
+              <Col xs={24} md={4}>
+                <Button type="primary" block icon={<PlusOutlined />} onClick={addScenario}>
+                  添加场景
                 </Button>
-              </CardContent>
-            </Card>
+              </Col>
+            </Row>
+          </Card>
 
-            <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr]">
-              <Card className="bg-card/85">
-                <CardHeader>
-                  <CardTitle>场景分布</CardTitle>
-                  <CardDescription>点击任一场景即可下钻查看客户明细和聊天记录。</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {scenarioResult.stats.map((scenario) => {
-                    const ratio = Math.round((scenario.count / chatSessions.length) * 100);
-                    return (
-                      <button
-                        key={scenario.id}
-                        type="button"
-                        className={`w-full rounded-lg border p-3 text-left transition ${
-                          activeScenarioId === scenario.id
-                            ? "border-primary/60 bg-primary/10"
-                            : "border-border/70 bg-background/50 hover:border-primary/40"
-                        }`}
-                        onClick={() => setActiveScenarioId(scenario.id)}
-                      >
-                        <div className="flex items-center justify-between gap-2 text-sm">
-                          <div className="font-medium">{scenario.name}</div>
-                          <div className="text-muted-foreground">{scenario.count} 条</div>
-                        </div>
-                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div className="h-full rounded-full bg-primary" style={{ width: `${ratio}%` }} />
-                        </div>
-                        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{scenario.source === "custom" ? "自定义" : "内置"}</span>
-                          <span>{ratio}%</span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </CardContent>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={15}>
+              <Card title="场景命中统计">
+                <Table columns={scenarioColumns} dataSource={scenarioResult.stats} pagination={false} size="middle" />
               </Card>
-
-              <Card className="bg-card/85">
-                <CardHeader>
-                  <CardTitle>{activeScenario?.name ?? "未选择场景"}</CardTitle>
-                  <CardDescription>
-                    关键词：{activeScenario?.keywords.join("、") ?? "-"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    命中会话 {activeScenario?.count ?? 0} 条。
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      openDrill(
-                        `${activeScenario?.name ?? "场景"} - 客户下钻`,
-                        "按会话展示客户详情和原始聊天记录。",
-                        activeScenario?.sessions ?? [],
-                      )
-                    }
-                  >
-                    查看客户明细
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="product" className="space-y-4">
-            <Card className="bg-card/85">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Search className="size-4" />
-                  产品需求热度排行
-                </CardTitle>
-                <CardDescription>{productInsight.summary}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {productInsight.rows.map((item) => {
-                  const width = Math.max(
-                    12,
-                    Math.round((item.heat / productInsight.maxHeat) * 100),
-                  );
-                  return (
-                    <div key={item.id} className="rounded-lg border border-border/70 bg-background/50 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <div className="font-medium">{item.name}</div>
-                          <div className="text-xs text-muted-foreground">{item.category}</div>
-                        </div>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          onClick={() =>
-                            openDrill(
-                              `产品需求下钻：${item.name}`,
-                              `热度 ${item.heat}，关联客户会话 ${item.sessions.length} 条。`,
-                              item.sessions,
-                            )
-                          }
-                        >
-                          查看关联会话
-                        </Button>
-                      </div>
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-[linear-gradient(90deg,#2dd4bf,#60a5fa)]"
-                          style={{ width: `${width}%` }}
-                        />
-                      </div>
-                      <p className="mt-2 text-xs text-muted-foreground">需求热度：{item.heat}</p>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </section>
-
-      <Dialog open={drill.open} onOpenChange={(open) => setDrill((prev) => ({ ...prev, open }))}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <MessageSquareText className="size-4" />
-              {drill.title}
-            </DialogTitle>
-            <DialogDescription>{drill.description}</DialogDescription>
-          </DialogHeader>
-
-          <ScrollArea className="h-[420px] rounded-md border border-border/70 bg-background/40 p-4">
-            <div className="space-y-4">
-              {drill.sessions.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">
-                  当前条件下暂无命中会话。
-                </div>
-              ) : (
-                drill.sessions.map((session) => (
-                  <div key={session.id} className="rounded-lg border border-border/70 bg-card/60 p-3">
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-                      <p className="font-medium">
-                        {session.customerName} · {session.customerTag} · {session.region}
-                      </p>
-                      <p className="text-xs text-muted-foreground">会话ID：{session.id}</p>
-                    </div>
-                    <div className="space-y-2">
-                      {session.messages.map((message, index) => (
-                        <div key={`${session.id}-${index}`} className="rounded-md bg-background/70 p-2 text-sm">
-                          <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                            <span>{message.speaker}</span>
-                            <span>{message.at}</span>
-                          </div>
-                          <p>{message.text}</p>
-                        </div>
+            </Col>
+            <Col xs={24} lg={9}>
+              <Card title={activeScenario ? `场景详情：${activeScenario.name}` : "场景详情"}>
+                {activeScenario ? (
+                  <Space direction="vertical" size={10} style={{ width: "100%" }}>
+                    <Text type="secondary">该场景命中 {activeScenario.count} 条会话。</Text>
+                    <Space size={[8, 8]} wrap>
+                      {activeScenario.keywords.map((keyword) => (
+                        <Tag key={keyword} color="processing">
+                          {keyword}
+                        </Tag>
                       ))}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </ScrollArea>
+                    </Space>
+                    <Button
+                      icon={<SearchOutlined />}
+                      onClick={() =>
+                        openDrill(
+                          activeScenario.name,
+                          `命中关键词：${activeScenario.keywords.join(" / ")}`,
+                          activeScenario.sessions,
+                        )
+                      }
+                    >
+                      查看匹配会话
+                    </Button>
+                  </Space>
+                ) : (
+                  <Text type="secondary">暂无场景数据</Text>
+                )}
+              </Card>
+            </Col>
+          </Row>
+        </Space>
+      ),
+    },
+    {
+      key: "product",
+      label: "产品需求洞察",
+      children: (
+        <Card title="高意向产品热度">
+          <Space direction="vertical" size={12} style={{ width: "100%" }}>
+            <Paragraph style={{ margin: 0 }}>{productInsight.summary}</Paragraph>
+            <Table columns={productColumns} dataSource={productInsight.rows} pagination={false} size="middle" />
+          </Space>
+        </Card>
+      ),
+    },
+    {
+      key: "sessions",
+      label: "会话明细",
+      children: (
+        <Card title="全部会话">
+          <List
+            dataSource={chatSessions}
+            renderItem={(session) => (
+              <List.Item key={session.id}>
+                <Card style={{ width: "100%" }}>
+                  <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                    <Space wrap>
+                      <Text strong>{session.customerName}</Text>
+                      <Tag>{session.customerTag}</Tag>
+                      <Tag color="geekblue">{session.region}</Tag>
+                      <Text type="secondary">{session.id}</Text>
+                    </Space>
+                    <Divider style={{ margin: "4px 0" }} />
+                    <Space direction="vertical" size={8} style={{ width: "100%" }}>
+                      {session.messages.map((line, idx) => (
+                        <Flex key={`${session.id}-${idx}`} justify="space-between" align="center" style={{ gap: 8 }}>
+                          <Text>
+                            <Text strong>{line.speaker}：</Text>
+                            {line.text}
+                          </Text>
+                          <Text type="secondary">{line.at}</Text>
+                        </Flex>
+                      ))}
+                    </Space>
+                  </Space>
+                </Card>
+              </List.Item>
+            )}
+          />
+        </Card>
+      ),
+    },
+  ];
 
-          <DialogFooter showCloseButton />
-        </DialogContent>
-      </Dialog>
-    </main>
+  return (
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: "#2563eb",
+          colorInfo: "#2563eb",
+          borderRadius: 10,
+        },
+      }}
+    >
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "32px 20px 40px" }}>
+        <Card
+          style={{
+            marginBottom: 16,
+            border: "1px solid #dbeafe",
+            background: "linear-gradient(135deg, #eff6ff 0%, #f8fafc 60%, #ffffff 100%)",
+          }}
+        >
+          <Space direction="vertical" size={8} style={{ width: "100%" }}>
+            <Text style={{ color: "#2563eb", fontWeight: 600, letterSpacing: 0.5 }}>Conversation Insight Studio</Text>
+            <Title level={2} style={{ margin: 0 }}>
+              客服对话洞察看板
+            </Title>
+            <Paragraph style={{ margin: 0 }}>
+              基于客服聊天记录，快速识别情绪趋势、场景分布与产品需求热点，帮助团队更快定位问题与机会。
+            </Paragraph>
+          </Space>
+        </Card>
+
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col xs={24} sm={8}>
+            <Card>
+              <Statistic title="正向会话" value={emotionResult.positiveCount} prefix={<SmileOutlined />} />
+            </Card>
+          </Col>
+          <Col xs={24} sm={8}>
+            <Card>
+              <Statistic title="负向会话" value={emotionResult.negativeCount} prefix={<FrownOutlined />} />
+            </Card>
+          </Col>
+          <Col xs={24} sm={8}>
+            <Card>
+              <Statistic title="高意向产品" value={productInsight.rows.length} prefix={<ThunderboltOutlined />} />
+            </Card>
+          </Col>
+        </Row>
+
+        <Card>
+          <Tabs
+            defaultActiveKey="emotion"
+            items={tabItems}
+            tabBarExtraContent={
+              <Space>
+                <Tag icon={<AppstoreOutlined />} color="blue">
+                  场景引擎
+                </Tag>
+                <Tag icon={<MessageOutlined />} color="cyan">
+                  会话样本 {chatSessions.length}
+                </Tag>
+              </Space>
+            }
+          />
+        </Card>
+
+        <Modal
+          open={drill.open}
+          title={drill.title}
+          width={860}
+          onCancel={() => setDrill((prev) => ({ ...prev, open: false }))}
+          footer={null}
+        >
+          <Paragraph type="secondary">{drill.description}</Paragraph>
+          <Divider />
+          {drill.sessions.length === 0 ? (
+            <Empty description="暂无匹配会话" />
+          ) : (
+            <List
+              dataSource={drill.sessions}
+              renderItem={(session) => (
+                <List.Item key={session.id}>
+                  <Card size="small" style={{ width: "100%" }}>
+                    <Space direction="vertical" size={6} style={{ width: "100%" }}>
+                      <Space>
+                        <Text strong>{session.customerName}</Text>
+                        <Tag>{session.customerTag}</Tag>
+                        <Text type="secondary">{session.id}</Text>
+                      </Space>
+                      {session.messages.map((line, index) => (
+                        <Flex key={`${session.id}-drill-${index}`} justify="space-between" style={{ gap: 8 }}>
+                          <Text>
+                            <Text strong>{line.speaker}：</Text>
+                            {line.text}
+                          </Text>
+                          <Text type="secondary">{line.at}</Text>
+                        </Flex>
+                      ))}
+                    </Space>
+                  </Card>
+                </List.Item>
+              )}
+            />
+          )}
+        </Modal>
+      </div>
+    </ConfigProvider>
   );
 }
