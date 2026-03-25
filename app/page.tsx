@@ -19,6 +19,12 @@ type MemberItem = {
   avatar: string;
 };
 
+type MentionOption = {
+  type: InsertType;
+  label: string;
+  icon: string;
+};
+
 const leftNavItems = [
   "首页",
   "获客",
@@ -123,6 +129,11 @@ const memberData: MemberItem[] = [
   { id: "u11", name: "余园园", dept: "星云咨询管理", avatar: "余" },
 ];
 
+const mentionOptions: MentionOption[] = [
+  { type: "metric", label: "数据指标", icon: "📊" },
+  { type: "member", label: "企业成员", icon: "👥" },
+];
+
 function getColorByText(text: string) {
   const colors = ["#9cc0ff", "#ffc89c", "#9de6cb", "#d5b2ff", "#ffc1d8", "#87d7f7"];
   let total = 0;
@@ -140,6 +151,7 @@ export default function Home() {
 
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionPos, setMentionPos] = useState({ x: 16, y: 86 });
+  const [activeMentionIndex, setActiveMentionIndex] = useState(0);
 
   const [metricOpen, setMetricOpen] = useState(false);
   const [metricSearch, setMetricSearch] = useState("");
@@ -228,6 +240,32 @@ export default function Home() {
   };
 
   const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (mentionOpen) {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setActiveMentionIndex((prev) => (prev + 1) % mentionOptions.length);
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setActiveMentionIndex((prev) => (prev - 1 + mentionOptions.length) % mentionOptions.length);
+        return;
+      }
+
+      if (event.key === "Enter") {
+        event.preventDefault();
+        openInsertModal(mentionOptions[activeMentionIndex].type);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMentionOpen(false);
+        return;
+      }
+    }
+
     if (event.key !== "@") {
       return;
     }
@@ -235,6 +273,7 @@ export default function Home() {
     event.preventDefault();
     saveCurrentSelection();
     placeMentionMenu();
+    setActiveMentionIndex(0);
     setMentionOpen(true);
   };
 
@@ -308,6 +347,7 @@ export default function Home() {
 
   const openInsertModal = (type: InsertType) => {
     setMentionOpen(false);
+    setActiveMentionIndex(0);
 
     if (type === "metric") {
       setMetricOpen(true);
@@ -434,12 +474,19 @@ export default function Home() {
 
               {mentionOpen && (
                 <div className="mention-menu" ref={mentionMenuRef} style={{ left: mentionPos.x, top: mentionPos.y }}>
-                  <button type="button" onClick={() => openInsertModal("metric")}>
-                    数据指标
-                  </button>
-                  <button type="button" onClick={() => openInsertModal("member")}>
-                    企业成员
-                  </button>
+                  <div className="mention-menu-title">插入对象</div>
+                  {mentionOptions.map((option, index) => (
+                    <button
+                      key={option.type}
+                      type="button"
+                      className={activeMentionIndex === index ? "active" : ""}
+                      onMouseEnter={() => setActiveMentionIndex(index)}
+                      onClick={() => openInsertModal(option.type)}
+                    >
+                      <span>{option.icon}</span>
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
               )}
 

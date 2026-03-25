@@ -10,6 +10,8 @@
     "dev:desktop": "concurrently -k \"npm:dev:web\" \"npm:dev:electron\"",
     "build": "next build",
     "build:web": "next build",
+    "preview": "next build --webpack && npm run preview:serve",
+    "preview:serve": "python3 -m http.server 4173 --directory out",
     "build:desktop": "npm run build:web && electron-builder",
     "pack:desktop": "npm run build:web && electron-builder --dir",
     "start": "next start",
